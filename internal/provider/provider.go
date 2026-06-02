@@ -11,11 +11,13 @@ package provider
 
 import (
 	"context"
+	"os"
 
 	awdns "github.com/AuthenticWeb/awdns-go"
 	"github.com/AuthenticWeb/terraform-provider-awdns/internal/datasources"
 	"github.com/AuthenticWeb/terraform-provider-awdns/internal/resources"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
@@ -41,6 +43,16 @@ const defaultBaseURL = "https://api.authenticweb.com/external/v1"
 // surfaced in the schema for forward compatibility; the current SDK hard-codes
 // a 30s timeout and exposes no setter, so it is not yet wired through.
 const defaultRequestTimeout int64 = 30
+
+// Environment-variable fallbacks for the provider credentials. A config
+// attribute always wins; the env var is consulted only when the attribute is
+// unset. These names are the provider's documented auth contract (see README
+// "Authentication").
+const (
+	envClientID     = "AWDNS_CLIENT_ID"
+	envClientSecret = "AWDNS_CLIENT_SECRET"
+	envBaseURL      = "AWDNS_BASE_URL"
+)
 
 // Compile-time assertion that awdnsProvider implements the framework interface.
 var _ provider.Provider = (*awdnsProvider)(nil)
@@ -72,17 +84,17 @@ func (p *awdnsProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp
 		MarkdownDescription: "Manage Authentic Web DNS hosted zones and records via the AW external API.",
 		Attributes: map[string]schema.Attribute{
 			"client_id": schema.StringAttribute{
-				Required:            true,
-				MarkdownDescription: "OAuth2 client ID for the AW external API (client-credentials grant).",
+				Optional:            true,
+				MarkdownDescription: "OAuth2 client ID for the AW external API (client-credentials grant). May also be set with the `" + envClientID + "` environment variable; the argument takes precedence.",
 			},
 			"client_secret": schema.StringAttribute{
-				Required:            true,
+				Optional:            true,
 				Sensitive:           true,
-				MarkdownDescription: "OAuth2 client secret for the AW external API (client-credentials grant).",
+				MarkdownDescription: "OAuth2 client secret for the AW external API (client-credentials grant). May also be set with the `" + envClientSecret + "` environment variable; the argument takes precedence.",
 			},
 			"base_url": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "Base URL of the AW external API. Defaults to `" + defaultBaseURL + "`.",
+				MarkdownDescription: "Base URL of the AW external API. May also be set with the `" + envBaseURL + "` environment variable. Defaults to `" + defaultBaseURL + "`.",
 			},
 			"request_timeout": schema.Int64Attribute{
 				Optional:            true,
@@ -122,22 +134,8 @@ func (p *awdnsProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		return
 	}
 
-	baseURL := defaultBaseURL
-	if !config.BaseURL.IsNull() {
-		baseURL = config.BaseURL.ValueString()
-	}
-
-	clientID := config.ClientID.ValueString()
-	clientSecret := config.ClientSecret.ValueString()
-
-	if clientID == "" {
-		resp.Diagnostics.AddAttributeError(path.Root("client_id"),
-			"Missing client_id", "client_id must be a non-empty string.")
-	}
-	if clientSecret == "" {
-		resp.Diagnostics.AddAttributeError(path.Root("client_secret"),
-			"Missing client_secret", "client_secret must be a non-empty string.")
-	}
+	clientID, clientSecret, baseURL, diags := resolveCredentials(config)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -151,6 +149,43 @@ func (p *awdnsProvider) Configure(ctx context.Context, req provider.ConfigureReq
 
 	resp.DataSourceData = client
 	resp.ResourceData = client
+}
+
+// resolveCredentials applies the provider's config-then-environment precedence
+// for client_id, client_secret, and base_url, and applies the base_url default.
+// A non-null config attribute always wins; otherwise the matching AWDNS_* env
+// var is used. It returns the resolved values plus diagnostics for any required
+// credential still empty by both paths. It is pure (constructs no client) so the
+// precedence and the "missing credential" errors are unit-testable without
+// standing up a framework ConfigureRequest.
+func resolveCredentials(config awdnsProviderModel) (clientID, clientSecret, baseURL string, diags diag.Diagnostics) {
+	clientID = os.Getenv(envClientID)
+	if !config.ClientID.IsNull() {
+		clientID = config.ClientID.ValueString()
+	}
+	clientSecret = os.Getenv(envClientSecret)
+	if !config.ClientSecret.IsNull() {
+		clientSecret = config.ClientSecret.ValueString()
+	}
+	baseURL = os.Getenv(envBaseURL)
+	if !config.BaseURL.IsNull() {
+		baseURL = config.BaseURL.ValueString()
+	}
+	if baseURL == "" {
+		baseURL = defaultBaseURL
+	}
+
+	if clientID == "" {
+		diags.AddAttributeError(path.Root("client_id"),
+			"Missing client_id",
+			"Set the provider \"client_id\" argument or the "+envClientID+" environment variable.")
+	}
+	if clientSecret == "" {
+		diags.AddAttributeError(path.Root("client_secret"),
+			"Missing client_secret",
+			"Set the provider \"client_secret\" argument or the "+envClientSecret+" environment variable.")
+	}
+	return clientID, clientSecret, baseURL, diags
 }
 
 // Resources returns the provider's managed resources: awdns_dns_record, which
