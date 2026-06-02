@@ -14,6 +14,7 @@ import (
 
 	awdns "github.com/AuthenticWeb/awdns-go"
 	"github.com/AuthenticWeb/terraform-provider-awdns/internal/datasources"
+	"github.com/AuthenticWeb/terraform-provider-awdns/internal/resources"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -152,10 +153,12 @@ func (p *awdnsProvider) Configure(ctx context.Context, req provider.ConfigureReq
 	resp.ResourceData = client
 }
 
-// Resources returns the provider's managed resources. The awdns_dns_record
-// resource targets the projected record API and lands in a later component.
+// Resources returns the provider's managed resources: awdns_dns_record, which
+// manages a DNS record within a domain via the projected record API.
 func (p *awdnsProvider) Resources(_ context.Context) []func() resource.Resource {
-	return nil
+	return []func() resource.Resource{
+		resources.NewDNSRecordResource,
+	}
 }
 
 // DataSources returns the provider's data sources: a single-domain lookup
