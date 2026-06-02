@@ -13,6 +13,7 @@ import (
 	"context"
 
 	awdns "github.com/AuthenticWeb/awdns-go"
+	"github.com/AuthenticWeb/terraform-provider-awdns/internal/datasources"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -157,7 +158,12 @@ func (p *awdnsProvider) Resources(_ context.Context) []func() resource.Resource 
 	return nil
 }
 
-// DataSources returns the provider's data sources. None are implemented yet.
+// DataSources returns the provider's data sources: a single-domain lookup
+// (awdns_domain) and a filtered list (awdns_domains). Both target the live
+// domain endpoints of the AW external API.
 func (p *awdnsProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return nil
+	return []func() datasource.DataSource{
+		datasources.NewDomainDataSource,
+		datasources.NewDomainsDataSource,
+	}
 }
