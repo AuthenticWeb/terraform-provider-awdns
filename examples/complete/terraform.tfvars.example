@@ -1,0 +1,14 @@
+# Sample values for the "complete" awdns example.
+#
+# Copy this file to terraform.tfvars and edit, OR omit the two credential lines
+# and export them as environment variables instead:
+#
+#   export AWDNS_CLIENT_ID="your-oauth2-client-id"
+#   export AWDNS_CLIENT_SECRET="your-oauth2-client-secret"
+#
+# Never commit a real terraform.tfvars — it holds live credentials.
+
+awdns_client_id     = "your-oauth2-client-id"
+awdns_client_secret = "your-oauth2-client-secret"
+awdns_base_url      = "https://api.authenticweb.com/external/v1"
+domain_fqdn         = "example.com"
