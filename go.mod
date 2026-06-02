@@ -2,7 +2,7 @@ module github.com/AuthenticWeb/terraform-provider-awdns
 
 go 1.25.8
 
-require github.com/AuthenticWeb/awdns-go v0.1.0
+require github.com/AuthenticWeb/awdns-go v0.1.0-alpha
 
 require (
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
@@ -62,7 +62,3 @@ require (
 	google.golang.org/grpc v1.79.3 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-// The awdns-go SDK has no published v0.1.0 tag yet; build against the local
-// checkout. Drop this replace once the SDK is tagged and pullable.
-replace github.com/AuthenticWeb/awdns-go => ../awdns-go
